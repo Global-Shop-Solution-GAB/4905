@@ -1,0 +1,672 @@
+Program.Sub.ScreenSU.Start
+Gui.Form..Create
+Gui.Form..Caption("Date Range Selection")
+Gui.Form..Size(25800,14370)
+Gui.Form..MinX(0)
+Gui.Form..MinY(0)
+Gui.Form..Position(0,0)
+Gui.Form..BackColor(-2147483633)
+Gui.Form..MousePointer(0)
+Gui.Form..Event(UnLoad,Form_UnLoad)
+Gui.Form.lbl1.Create(Label,"Start Date",True,1035,255,0,90,165,True,0,"Arial",8,-2147483633,0)
+Gui.Form.lbl2.Create(Label,"End Date",True,1035,255,0,2190,165,True,0,"Arial",8,-2147483633,0)
+Gui.Form.dtpStartDate.Create(DatePicker)
+Gui.Form.dtpStartDate.Size(1935,285)
+Gui.Form.dtpStartDate.Position(90,405)
+Gui.Form.dtpStartDate.TabStop(True)
+Gui.Form.dtpStartDate.TabIndex(1)
+Gui.Form.dtpEndDate.Create(DatePicker)
+Gui.Form.dtpEndDate.Size(1935,285)
+Gui.Form.dtpEndDate.Position(2190,405)
+Gui.Form.dtpEndDate.TabStop(True)
+Gui.Form.dtpEndDate.TabIndex(2)
+Gui.Form.cmdOK.Create(Button)
+Gui.Form.cmdOK.Size(855,375)
+Gui.Form.cmdOK.Position(4275,360)
+Gui.Form.cmdOK.Caption("OK")
+Gui.Form.cmdOK.Event(Click,cmdOK_Click)
+Gui.Form.cmdOK.TabStop(True)
+Gui.Form.cmdOK.TabIndex(3)
+Gui.Form.cmdExport.Create(Button)
+Gui.Form.cmdExport.Size(2070,375)
+Gui.Form.cmdExport.Position(90,13365)
+Gui.Form.cmdExport.Caption("Export Grid to Excel")
+Gui.Form.cmdExport.Event(Click,cmdExport_Click)
+Gui.Form.cmdExport.TabStop(True)
+Gui.Form.cmdExport.TabIndex(5)
+Gui.Form.cmdPrint.Create(Button)
+Gui.Form.cmdPrint.Size(855,375)
+Gui.Form.cmdPrint.Position(7440,360)
+Gui.Form.cmdPrint.Caption("Print")
+Gui.Form.cmdPrint.Event(Click,cmdPrint_Click)
+Gui.Form.cmdPrint.TabStop(True)
+Gui.Form.cmdPrint.TabIndex(4)
+Gui.Form.lblRowsLabel.Create(Label,"Rows",True,570,255,0,5355,465,True,0,"Arial",8,-2147483633,0)
+Gui.Form.lblRows.Create(Label,"",True,1275,255,0,5955,465,True,1,"Arial",8,-2147483646,0)
+Gui.Form.lblRows.BorderStyle(2)
+Gui.Form.tabMain.Create(Tab)
+Gui.Form.tabMain.Size(25425,12555)
+Gui.Form.tabMain.Position(90,780)
+Gui.Form.tabMain.Event(Click,tabMain_Click)
+Gui.Form.tabMain.Tabs(2)
+Gui.Form.tabMain.SetTab(0)
+Gui.Form.tabMain.Caption("Employee Tardy Report")
+Gui.Form.tabMain.SetTab(1)
+Gui.Form.tabMain.Caption("Employee Absentee Report")
+Gui.Form.gsAttendance.Create(GsGridControl)
+Gui.Form.gsAttendance.Size(25425,12555)
+Gui.Form.gsAttendance.Position(0,0)
+Gui.Form.gsAttendance.TabStop(True)
+Gui.Form.gsAttendance.TabIndex(6)
+Gui.Form.gsAttendance.Parent("tabMain",0)
+Gui.Form.GsGcAbsentee.Create(GsGridControl)
+Gui.Form.GsGcAbsentee.Size(25425,12555)
+Gui.Form.GsGcAbsentee.Position(0,0)
+Gui.Form.GsGcAbsentee.Parent("tabMain",1)
+Gui.ProBar..Create
+Gui.ProBar..Caption("Progress")
+Gui.ProBar..Size(12915,1290)
+Gui.ProBar..MinX(0)
+Gui.ProBar..MinY(0)
+Gui.ProBar..Position(0,0)
+Gui.ProBar..BackColor(-2147483633)
+Gui.ProBar..MousePointer(0)
+Gui.ProBar..Event(UnLoad,Form_UnLoad)
+Gui.ProBar.probar.Create(ProgressBar)
+Gui.ProBar.probar.Size(12165,105)
+Gui.ProBar.probar.Position(315,210)
+Gui.ProBar.lblProBar.Create(Label,"",True,12150,255,0,330,435,True,0,"Arial",8,-2147483633,0)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+'12220
+V.Global.iGrid.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'BN, Feb 26, 2018
+'Project description is at the bottom
+'TJS, June 2020
+'Quote 12220: Business Case: Customer would like to run a report for the prior day to determine who was missing so they can enter the Absentee Record.
+'Solution:
+'Original solution called for a Crystal Report, however after discussing with the customer, it was determined that adding a gridview to this project
+'to show employees with no activity for the same date range was a better fit.  Changes marked with 12220 throughout.
+
+F.Intrinsic.Control.Try
+V.Local..BulkDeclareString(sError)
+V.Local.bInSecurityGroup.Declare
+
+'Open long time-out connection in case we want to retrieve and save big data for many years (10 years data ~ 160000 records will take about 1.5 minute to retrieve and 5 minutes to save)
+F.ODBC.Connection!conx.OpenCompanyConnection(10000)
+F.Global.Security.IsInGroup(V.Caller.User,"TIMETARD",V.Caller.CompanyCode,V.Local.bInSecurityGroup)
+F.Intrinsic.Control.If(V.Local.bInSecurityGroup.Not)
+	F.Intrinsic.UI.Msgbox("No permission to use this program","Security Group Permission")
+	F.ODBC.Connection!conx.Close
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.CallSub(SetIcon)
+Gui.ProBar.lblProBar.Caption("Collecting Shift Time setup...")
+Gui.ProBar..Show
+F.Intrinsic.Control.CallSub("Pull_Shift_Time")
+Gui.ProBar..Visible(False)
+F.Intrinsic.Control.CallSub("Set_Anchor")
+Gui.Form.tabMain.SetTab(0)
+Gui.Form..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Set_Anchor.Start
+F.Intrinsic.Control.Try
+V.Local..BulkDeclareString(sError)
+
+'0 - None   1 - Top     2 - Bottom  	4 - Left 		8 - Right
+Gui.Form.lbl1.Anchor(5)
+Gui.Form.lbl2.Anchor(5)
+Gui.Form.dtpEndDate.Anchor(5)
+Gui.Form.dtpStartDate.Anchor(5)
+Gui.Form.cmdPrint.Anchor(5)
+Gui.Form.lblRows.Anchor(5)
+Gui.Form.lblRowsLabel.Anchor(5)
+Gui.Form.gsAttendance.Anchor(15)
+Gui.Form.cmdExport.Anchor(6)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.Set_Anchor.End
+
+Program.Sub.Pull_Shift_Time.Start
+F.Intrinsic.Control.Try
+V.Local..BulkDeclareString(sError,sDay,sSQL,sRet)
+V.Local..BulkDeclareLong(iOut,iInner)
+
+'Every header(composite key of Shift,Dept,Shift_Group) will have a Start_Time and Stop_Time from Sunday to Saturday
+F.Intrinsic.String.Split("SUN,MON,TUE,WED,THR,FRI,SAT",",",V.Local.sDay)
+F.Data.DataTable.CreateFromString("ShiftTime","","Shift*!*Dept*!*Shift_Group*!*Week_Day*!*Start_Time*!*Stop_Time*!*Start_For_Cal*!*Stop_For_Cal","String*!*String*!*String*!*String*!*String*!*String*!*Long*!*Long","*!*","$!$",True)
+F.Data.DataTable.DeleteRow("ShiftTime")
+
+'Get the header(composite key of Shift,Dept,Shift_Group)
+F.Data.DataTable.CreateFromSQL("D_Header","conx","Select distinct Shift,Dept,Shift_Group from Lunch_Shift order by Shift,Dept",True)
+
+'For each header, add the Start_Time and Stop_time for each day
+F.Intrinsic.Control.If(V.DataTable.D_Header.RowCount,>,0)
+	Gui.ProBar.probar.Max(V.DataTable.D_Header.RowCount)
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.For(V.Local.iOut,0,V.DataTable.D_Header.RowCount--,1)
+	Gui.ProBar.probar.Value(V.Local.iOut)
+	F.Intrinsic.Control.For(V.Local.iInner,0,V.Local.sDay.UBound,1)
+		F.Intrinsic.String.Build("Select Left(Start_{0},2) + ':' + Right(Start_{0},2),left(Stop_{0},2) + ':' + right(Stop_{0},2),Cast(Start_{0} as Integer) as Start_For_Cal,Cast(Stop_{0} as Integer) as Stop_For_Cal  from Lunch_Shift where Shift = '{1}' and Dept = '{2}' and Shift_Group = '{3}'",V.Local.sDay(V.Local.iInner),V.DataTable.D_Header(V.Local.iOut).Shift!FieldValString,V.DataTable.D_Header(V.Local.iOut).Dept!FieldValString,V.DataTable.D_Header(V.Local.iOut).Shift_Group!FieldValString,V.Local.sSQL)
+		F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.sRet)
+		F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+			F.Intrinsic.String.Split(V.Local.sRet.Trim,"*!*",V.Local.sRet)
+			F.Data.DataTable.AddRow("ShiftTime","Shift",V.DataTable.D_Header(V.Local.iOut).Shift!FieldValString,"Dept",V.DataTable.D_Header(V.Local.iOut).Dept!FieldValString,"Shift_Group",V.DataTable.D_Header(V.Local.iOut).Shift_Group!FieldValString,"Week_Day",V.Local.sDay(V.Local.iInner),"Start_Time",V.Local.sRet(0),"Stop_Time",V.Local.sRet(1),"Start_For_Cal",V.Local.sRet(2),"Stop_For_Cal",V.Local.sRet(3))
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iInner)
+F.Intrinsic.Control.Next(V.Local.iOut)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.Pull_Shift_Time.End
+
+Program.Sub.cmdOK_Click.Start
+F.Intrinsic.Control.Try
+V.Local..BulkDeclareString(sError,sSQL,sStartDate,sEndDate,sFilter)
+V.Local..BulkDeclareDate(dStartDate,dEndDate)
+V.Local..BulkDeclareLong(iCnt,iTotal)
+
+'Pull data from V_Time_Attendance and bind to datatable TimeAttendance
+F.Intrinsic.UI.InvokeWaitDialog("Getting Attendance Time...")
+F.Intrinsic.String.Format(V.Screen.Form!dtpStartDate.Value,"YYYY-MM-DD",V.Local.sStartDate)
+F.Intrinsic.String.Format(V.Screen.Form!dtpEndDate.Value,"YYYY-MM-DD",V.Local.sEndDate)
+F.Intrinsic.String.Build("SELECT Employee,Shift,Dept,Rec_Group as Shift_Group,Charge_Date,Case When WeekDay(Date_In) = 1 Then 'SUN' When WeekDay(Date_In) = 2 Then 'MON' When WeekDay(Date_In) = 3 Then 'TUE' When WeekDay(Date_In) = 4 Then 'WED' When WeekDay(Date_In) = 5 Then 'THR' When WeekDay(Date_In) = 6 Then 'FRI' When WeekDay(Date_In) = 7 Then 'SAT' End as Week_Day,Date_In,Convert(Time_In,SQL_CHAR) as Time_In,Date_Out,Convert(Time_Out,SQL_CHAR) as Time_Out From V_TIME_ATTENDANCE Where Date_In between '{0}' and '{1}'",V.Local.sStartDate,V.Local.sEndDate,V.Local.sSQL)
+F.Intrinsic.Control.If(V.DataTable.TimeAttendance.Exists)
+	F.Data.DataTable.Close("TimeAttendance")
+F.Intrinsic.Control.EndIf
+F.Data.DataTable.CreateFromSQL("TimeAttendance","conx",V.Local.sSQL,True)
+
+'Create table D_Report by joining table TimeAttendance with table ShiftTime in order to see if an employee is early/late compared to the setup ShiftTime
+F.Intrinsic.UI.ChangeWaitStatus("Linking Attendance Time with Shift Time...")
+F.Intrinsic.Control.If(V.DataTable.D_Report.Exists)
+	F.Data.DataTable.Close("D_Report")
+F.Intrinsic.Control.EndIf
+F.Data.Linq.Join("LeftJoin","datatable","TimeAttendance*!*t","datatable","ShiftTime*!*s","t.Shift = s.Shift and t.Dept = s.Dept and t.Shift_Group = s.Shift_Group and t.Week_Day = s.Week_Day","t.Employee*!*t.Shift*!*t.Dept*!*t.Shift_Group*!*t.Charge_Date*!*t.Week_Day*!*t.Date_In*!*s.Start_Time*!*t.Time_In*!*t.Date_Out*!*s.Stop_Time*!*t.Time_Out*!*s.Start_For_Cal*!*s.Stop_For_Cal","","","","D_Report",True)
+F.Data.DataTable.AddExpressionColumn("D_Report","Date_Out_Setup","Date","IIF(Stop_For_Cal > Start_For_Cal,Date_In,'1900-01-01')")
+
+'Create table VacSick and join with table D_Report on Employee,Date_In. The result table will be D_Report2
+F.Intrinsic.UI.ChangeWaitStatus("Linking with Vacation/Sick data...")
+F.Intrinsic.Control.If(V.DataTable.VacSick.Exists)
+	F.Data.DataTable.Close("VacSick")
+F.Intrinsic.Control.EndIf
+F.Intrinsic.String.Build("select Employee,Date_Cymd as Day_Vac_Sick,sum(Vac) as Vacation,sum(Sick) as Sick from V_Pay_Hist_Accru where Date_cymd between '{0}' and '{1}' and (vac < 0 or sick <0) group by  Employee,Date_Cymd",V.Local.sStartDate,V.Local.sEndDate,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("VacSick","conx",V.Local.sSQL,True)
+F.Intrinsic.Control.If(V.DataTable.D_Report2.Exists)
+	F.Data.DataTable.Close("D_Report2")
+F.Intrinsic.Control.EndIf
+F.Data.Linq.Join("LeftJoin","datatable","D_Report*!*t","datatable","VacSick*!*v","t.Employee = V.Employee and t.Date_In = V.Day_Vac_Sick","t.Employee*!*t.Shift*!*t.Dept*!*t.Shift_Group*!*t.Charge_Date*!*t.Week_Day*!*t.Date_In*!*t.Start_Time*!*t.Time_In*!*t.Date_Out*!*t.Stop_Time*!*t.Time_Out*!*t.Date_Out_Setup*!*V.Vacation*!*V.Sick","","","","D_Report2",True)
+F.Data.DataTable.AddColumn("D_Report2","TRMNL","String",V.Caller.Terminal)
+
+'Delete old data by TRMNL
+F.Intrinsic.String.Build("Delete from GCG_4905_Emp_Tardy where TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+'Saving data to custom table GCG_4905_Emp_Tardy
+F.Intrinsic.UI.ChangeWaitStatus("Saving data to custom table...")
+F.Data.DataTable.SaveToDB("D_Report2","conx","GCG_4905_Emp_Tardy","",128)
+'If the shift has a Stop time for the next day, set the date_out_setup the next day:
+F.Intrinsic.String.Build("update gcg_4905_emp_tardy set Date_Out_Setup = DATEADD(day,1,Date_In) where Date_Out_Setup = '1900-01-01' and TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'point
+'Calculate
+F.Intrinsic.UI.ChangeWaitStatus("Calculating...")
+
+'1/Time_in - Start_Time: for Comming ============================================================================================================================================================================
+
+'Difference in seconds between the employee Login time and the Shift Start time 
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Come_Sec = DATEDIFF(second,DATETIMEFROMPARTS(Left(DATE_IN,4),SUBSTRING(DATE_IN,6,2),Right(DATE_IN,2),SUBSTRING(Time_In,1,2),SUBSTRING(Time_In,4,2),SUBSTRING(Time_In,7,2),'00'),DATETIMEFROMPARTS(Left(DATE_IN,4),SUBSTRING(DATE_IN,6,2),Right(DATE_IN,2),SUBSTRING(Start_Time,1,2),SUBSTRING(Start_Time,4,2),'00','00')) where Date_In <> '1900-01-01' and TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Set the label to Early/Late based on the difference in seconds above
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Come =  Case when IsNull(LateEarly_Come_Sec,0) > 0 then 'Early' when IsNull(LateEarly_Come_Sec,0) < 0 then 'Late' End  where TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Switch the LateEarly_Come_Sec to positive number, prepared for the next query
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Come_Sec = 0 - LateEarly_Come_Sec  where TRMNL = '{0}' and IsNull(LateEarly_Come_Sec,0) < 0;",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Format the difference from seconds to HH:MM:SS
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Come_Time = substring(DATEADD(second,LateEarly_Come_Sec,0),12,8) where Date_In <> '1900-01-01' and TRMNL = '{0}' and IsNull(LateEarly_Come_Sec,0) <> 0;",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+'2/Time_Out - Stop_Time: for Leaving ============================================================================================================================================================================
+
+'Difference in seconds between the employee Logout time and the Shift Stop time 
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Leave_Sec = DATEDIFF(second, DATETIMEFROMPARTS(Left(DATE_Out,4),SUBSTRING(DATE_Out,6,2),Right(DATE_Out,2),SUBSTRING(Time_Out,1,2),SUBSTRING (Time_Out,4,2),SUBSTRING(Time_Out,7,2),'00'),DATETIMEFROMPARTS(Left(DATE_Out_Setup,4),SUBSTRING(DATE_Out_Setup,6,2),Right(DATE_Out_Setup,2),SUBSTRING(Stop_Time,1,2),SUBSTRING(Stop_Time,4,2),'00','00')) where Date_Out <> '1900-01-01' and Date_Out_Setup <> '1900-01-01' and TRMNL = '{0}';",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Set the label to Early/Late based on the difference in seconds above
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Leave = Case when IsNull(LateEarly_Leave_Sec,0) > 0 then 'Early' when IsNull(LateEarly_Leave_Sec,0) < 0 then 'Late' End  where TRMNL = '{0}';",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Switch the LateEarly_Leave_Sec to positive number, prepared for the next query
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Leave_Sec = 0 - LateEarly_Leave_Sec  where TRMNL = '{0}' and IsNull(LateEarly_Leave_Sec,0) < 0;",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Format the difference from seconds to HH:MM:SS
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set LateEarly_Leave_Time = substring(DATEADD(second,LateEarly_Leave_Sec,0),12,8) where Date_Out <> '1900-01-01' and Date_Out_Setup <> '1900-01-01'and  TRMNL = '{0}' and IsNull(LateEarly_Leave_Sec,0) <> 0;",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+'3/Time worked ===================================================================================================================================================================================================
+'3.1
+'Time worked of the shift of the day: difference in seconds between the employee's login and logout time
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set Time_Worked_Sec = DATEDIFF(second, DATETIMEFROMPARTS(Left(DATE_In,4),SUBSTRING(DATE_In,6,2),Right(DATE_In,2),SUBSTRING(Time_In,1,2),SUBSTRING (Time_In,4,2),SUBSTRING(Time_In,7,2),'00'),DATETIMEFROMPARTS(Left(DATE_Out,4),SUBSTRING(DATE_Out,6,2),Right(DATE_Out,2),SUBSTRING(Time_Out,1,2),SUBSTRING (Time_Out,4,2),SUBSTRING(Time_Out,7,2),'00')) where Date_In <> '1900-01-01' and Date_Out <> '1900-01-01' and TRMNL = '{0}';",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'If the time worked of the shift of the day is greater than 86399 seconds (1 day), mark it as 'Days'
+F.Intrinsic.String.Build("Update GCG_4905_Emp_Tardy set Time_Worked = 'Days' where TRMNL = '{0}' and (IsNull(Time_Worked_Sec,0) > 86399 or IsNull(Time_Worked_Sec,0) < -86399)",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Format the Time worked from seconds to HH:MM:SS (for only those that have less than 86399 seconds (1 day))
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set Time_Worked = substring(DATEADD(second,Time_Worked_sec,0),12,8) where TRMNL = '{0}' and (IsNull(Time_Worked_Sec,0) < 86399 or IsNull(Time_Worked_Sec,0) > -86399);",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+'3.2 Get from database GCG_4905_Emp_Tardy, process these columns: Employee,Time_Worked_Sec,Time_Worked_Peri_Sec. For each employee, sum the Time_Worked_Sec and set the total to column Time_Worked_Peri_Sec. 
+'Processing in GAB instead of using SQL in DB to calculate the Sum. This will avoid the DB crashing.
+
+'Datatable "TimeWorkedPeriod"
+F.Intrinsic.Control.If(V.DataTable.TimeWorkedPeriod.Exists)
+	F.Data.DataTable.Close("TimeWorkedPeriod")
+F.Intrinsic.Control.EndIf
+F.Intrinsic.String.Build("Select TRMNL, Employee, Shift, Dept, Shift_Group, Charge_Date, Week_Day, Date_In, Start_Time, Time_In, LateEarly_Come_Sec, LateEarly_Come_Time, LateEarly_Come, Date_Out, Date_Out_Setup, Stop_Time, Time_Out, LateEarly_Leave_Sec, LateEarly_Leave_Time, LateEarly_Leave, Vacation, Sick, Time_Worked_Sec, Time_Worked, Time_Worked_Peri_Sec, Time_Worked_Peri_h, Time_Worked_Peri_d, Time_Worked_Peri_ht from GCG_4905_Emp_Tardy where TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("TimeWorkedPeriod","conx",V.Local.sSQL,"True")
+'Dataview "TimeWorkedPeriodDV"
+F.Intrinsic.Control.If(V.DataView.TimeWorkedPeriod!TimeWorkedPeriodDV.Exists)
+	F.Data.DataView.Close("TimeWorkedPeriod","TimeWorkedPeriodDV")
+F.Intrinsic.Control.EndIf
+F.Data.DataView.Create("TimeWorkedPeriod","TimeWorkedPeriodDV",22,"","")
+'List of distinct Employee: datatable "Employee"
+F.Intrinsic.Control.If(V.DataTable.Employee.Exists)
+	F.Data.DataTable.Close("Employee")
+F.Intrinsic.Control.EndIf
+F.Data.DataView.ToDataTableDistinct("TimeWorkedPeriod","TimeWorkedPeriodDV","Employee","Employee",True)
+'Set the proBar
+F.Intrinsic.Control.If(V.DataTable.Employee.RowCount,>,0)
+	Gui.ProBar.probar.Max(V.DataTable.Employee.RowCount)
+	Gui.ProBar.lblProBar.Caption("Calculating total hours worked/period...")
+	Gui.ProBar..Visible(True)
+F.Intrinsic.Control.EndIf
+'Loop through table Employee. For each employee, calculate the sum of Time_Worked_Sec and set to Time_Worked_Peri_Sec
+F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataTable.Employee.RowCount--,1)
+	Gui.ProBar.probar.Value(V.Local.iCnt)
+	F.Intrinsic.String.Build("Employee = '{0}'",V.DataTable.Employee(V.Local.iCnt).Employee!FieldValString,V.Local.sFilter)	
+	F.Data.DataTable.Compute("TimeWorkedPeriod","Sum(Time_Worked_Sec)",V.Local.sFilter,V.Local.iTotal)
+	F.Data.DataView.SetFilter("TimeWorkedPeriod","TimeWorkedPeriodDV",V.Local.sFilter)
+	F.Data.DataView.SetValue("TimeWorkedPeriod","TimeWorkedPeriodDV",-1,"Time_Worked_Peri_Sec",V.Local.iTotal)
+F.Intrinsic.Control.Next(V.Local.iCnt)
+Gui.ProBar..Visible(False)
+
+'Delete old data by TRMNL
+F.Intrinsic.String.Build("Delete from GCG_4905_Emp_Tardy where TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+F.Intrinsic.UI.ChangeWaitStatus("Saving to DB...")
+F.Data.DataTable.SaveToDB("TimeWorkedPeriod","conx","GCG_4905_Emp_Tardy","",128,"TRMNL@!@TRMNL*!*Employee@!@Employee*!*Shift@!@Shift*!*Dept@!@Dept*!*Shift_Group@!@Shift_Group*!*Charge_Date@!@Charge_Date*!*Week_Day@!@Week_Day*!*Date_In@!@Date_In*!*Start_Time@!@Start_Time*!*Time_In@!@Time_In*!*LateEarly_Come_Sec@!@LateEarly_Come_Sec*!*LateEarly_Come_Time@!@LateEarly_Come_Time*!*LateEarly_Come@!@LateEarly_Come*!*Date_Out@!@Date_Out*!*Date_Out_Setup@!@Date_Out_Setup*!*Stop_Time@!@Stop_Time*!*Time_Out@!@Time_Out*!*LateEarly_Leave_Sec@!@LateEarly_Leave_Sec*!*LateEarly_Leave_Time@!@LateEarly_Leave_Time*!*LateEarly_Leave@!@LateEarly_Leave*!*Vacation@!@Vacation*!*Sick@!@Sick*!*Time_Worked_Sec@!@Time_Worked_Sec*!*Time_Worked@!@Time_Worked*!*Time_Worked_Peri_Sec@!@Time_Worked_Peri_Sec*!*Time_Worked_Peri_h@!@Time_Worked_Peri_h*!*Time_Worked_Peri_d@!@Time_Worked_Peri_d*!*Time_Worked_Peri_ht@!@Time_Worked_Peri_ht")
+
+'3.3 Format the total of time worked from seconds to DD:HH:MM:SS
+F.Intrinsic.UI.ChangeWaitStatus("Formating...")
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set Time_Worked_Peri_d = Convert(Day(DATEADD(second,IsNull(Time_worked_peri_sec,0),0)) - 1,SQL_Char) + 'd:' +  substring(DATEADD(second,IsNull(Time_worked_peri_sec,0),0),12,8),Time_Worked_Peri_ht = (Day(DATEADD(second,IsNull(Time_worked_peri_sec,0),0)) - 1)* 24 + Hour(DATEADD(second,IsNull(Time_worked_peri_sec,0),0)) where TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+'Format the total of time worked from seconds to HH:MM:SS - Updated by KC on 8/1/2018 due to bug that caused a high number of seconds to not calculate total hours properly.
+F.Intrinsic.String.Build("update GCG_4905_Emp_Tardy set Time_Worked_Peri_h = CONCAT(DATEDIFF(HOUR, '1900-01-01 00:00:00', DATEADD(SECOND, ISNULL(Time_Worked_Peri_Sec,0),0)),CONCAT(':',CONCAT(RIGHT(CONCAT('0', MINUTE(DATEADD(SECOND, ISNULL(Time_Worked_Peri_Sec,0),0))),2),CONCAT(':',RIGHT(CONCAT('0', SECOND(DATEADD(SECOND, ISNULL(Time_Worked_Peri_Sec,0),0))),2))))) WHERE TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+
+'Binding the Grid
+F.Intrinsic.UI.ChangeWaitStatus("Binding grid...")
+F.Intrinsic.Control.If(V.DataTable.D_Grid.Exists)
+	F.Data.DataTable.Close("D_Grid")
+F.Intrinsic.Control.EndIf
+F.Intrinsic.String.Build("Select * from GCG_4905_Emp_Tardy  where TRMNL = '{0}' order by Date_In ",V.Caller.Terminal,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("D_Grid","conx",V.Local.sSQL,True)
+Gui.Form.lblRows.Caption(V.DataTable.D_Grid.RowCount)
+F.Data.Dictionary.CreateFromSQL("EmpNameDict","conx","Select Employee,Name from V_Employee_Mstr")
+F.Data.Dictionary.SetDefaultReturn("EmpNameDict","")
+F.Data.DataTable.AddColumn("D_Grid","Name","String","")
+F.Data.DataTable.FillFromDictionary("D_Grid","EmpNameDict","Employee","Name")
+F.Data.Dictionary.Close("EmpNameDict")
+Gui.Form.gsAttendance.AddGridviewFromDatatable("GV_Grid","D_Grid")
+F.Intrinsic.Control.CallSub("Format_Grid")
+Gui.Form.gsAttendance.MainView("GV_Grid")
+'12220
+F.Intrinsic.UI.ChangeWaitStatus("Gathering absentee data...")
+F.Intrinsic.Control.CallSub("Absentee")
+
+F.Intrinsic.UI.CloseWaitDialog
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdOK_Click.End
+
+Program.Sub.Format_Grid.Start
+F.Intrinsic.Control.Try
+V.Local..BulkDeclareString(sError)
+
+Gui.Form.gsAttendance.SuspendLayout()
+Gui.Form.gsAttendance.SetGridViewProperty("GV_Grid","MultiSelect",True)
+Gui.Form.gsAttendance.setGridViewProperty("GV_Grid","AllowSort",True)
+Gui.Form.gsAttendance.setGridViewProperty("GV_Grid","AllowFilter",True)
+Gui.Form.gsAttendance.setGridViewProperty("GV_Grid","OptionsDetailShowDetailTabs",False)
+Gui.Form.gsAttendance.setGridViewProperty("GV_Grid","OptionsViewShowGroupPanel",True)
+Gui.Form.gsAttendance.SetGridViewProperty("GV_Grid","EnableAppearanceOddRow",True)
+Gui.Form.gsAttendance.SetGridViewProperty("GV_Grid","OptionsFindAlwaysVisible",True)
+Gui.Form.gsAttendance.SetGridViewProperty("GV_Grid","OptionsViewShowAutoFilterRow",True)
+'Invisible
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","TRMNL,Shift_Group,Start_Time,Stop_Time,Week_Day,LateEarly_Come_Sec,LateEarly_Leave_Sec,Date_Out_Setup,Time_Worked_Sec,Time_Worked_Peri_Sec,Time_Worked_Peri_d,Time_Worked_Peri_ht","sProperty","Invisible")
+'VisibleIndex
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Employee,Name,Shift,Dept,Charge_Date,Date_In,Time_In,LateEarly_Come_Time,LateEarly_Come,Date_Out,Time_Out,LateEarly_Leave_Time,LateEarly_Leave,Vacation,Sick","sProperty","VisibleIndex")
+'Caption
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Employee@!@Empl.,Shift@!@Shift,Dept@!@Department,Shift_Group@!@Group,Charge_Date@!@Date Charge,Week_Day@!@Day In,Date_In@!@Date In,Start_Time@!@Time Start,Time_In@!@Time In,Date_Out@!@Date Out,Stop_Time@!@Time Stop,Time_Out@!@Time Out,Vacation@!@Vacation,Sick@!@Sick,LateEarly_Come_Time@!@Difference Come,LateEarly_Come@!@Early/Late,LateEarly_Leave_Time@!@Difference Leave,LateEarly_Leave@!@Early/Late,Time_Worked@!@Time Worked/Shift,Time_Worked_Peri_h@!@Time Worked/Period","sProperty","Caption")	
+'Width
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Shift,Shift_Group","sProperty","Width","sWidth","30")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Shift_Group","sProperty","Width","sWidth","40")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Employee,Week_Day","sProperty","Width","sWidth","50")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Start_Time,Stop_Time","sProperty","Width","sWidth","60")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","LateEarly_Come,LateEarly_Leave","sProperty","Width","sWidth","60")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Dept,Charge_Date,Date_In,Date_Out,Time_In,Time_Out,Vacation,Sick","sProperty","Width","sWidth","70")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","LateEarly_Come_Time,LateEarly_Leave_Time","sProperty","Width","sWidth","100")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Time_Worked,Time_Worked_Peri_h","sProperty","Width","sWidth","110")
+Gui.Form.gsAttendance.SetColumnProperty("GV_Grid","Name","MinWidth","170")
+'DisplayCustomDatetime
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Charge_Date,Date_In,Date_Out","sProperty","DisplayCustomDatetime")
+'CellBackColor
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Date_In,Start_Time,LateEarly_Come_Time,LateEarly_Come","sProperty","CellBackColor","sColor","#E0FFFF")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Time_In","sProperty","CellBackColor","sColor","#ADD8E6")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Time_Out","sProperty","CellBackColor","sColor","#F0E68C")
+F.Intrinsic.Control.CallSub(FormatBulk,"GS","gsAttendance","GV","GV_Grid","sInputColumns","Date_Out,Stop_Time,LateEarly_Leave_Time,LateEarly_Leave","sProperty","CellBackColor","sColor","#FAFAD2")
+
+Gui.Form.gsAttendance.ResumeLayout()
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.Format_Grid.End
+
+Program.Sub.FormatBulk.Start
+F.Intrinsic.Control.SetErrorHandler("FormatBulk")
+F.Intrinsic.Control.ClearErrors
+V.Local..BulkDeclareString(sError,sColumns,sHold)
+V.Local..BulkDeclareLong(iCnt)
+
+F.Intrinsic.String.Split(V.Args.sInputColumns,",",V.Local.sColumns)
+
+F.Intrinsic.Control.For(V.Local.iCnt,0,V.Local.sColumns.UBound,1)
+	F.Intrinsic.Control.SelectCase(V.Args.sProperty)
+		F.Intrinsic.Control.Case("Width")
+			Gui.Form.[V.Args.GS].SetColumnProperty(V.Args.GV,V.Local.sColumns(V.Local.iCnt),"MinWidth",V.Args.sWidth)
+			Gui.Form.[V.Args.GS].SetColumnProperty(V.Args.GV,V.Local.sColumns(V.Local.iCnt),"MaxWidth",V.Args.sWidth)	
+		F.Intrinsic.Control.Case("Invisible")
+			Gui.Form.[V.Args.GS].SetColumnProperty(V.Args.GV,V.Local.sColumns(V.Local.iCnt),"Visible",False)
+		F.Intrinsic.Control.Case("VisibleIndex")
+			Gui.Form.[V.Args.GS].SetColumnProperty(V.Args.GV,V.Local.sColumns(V.Local.iCnt),"VisibleIndex",V.Local.iCnt)
+		F.Intrinsic.Control.Case("Caption")
+			F.Intrinsic.String.Split(V.Local.sColumns(V.Local.iCnt),"@!@",V.Local.sHold)
+			Gui.Form.[V.Args.GS].SetColumnProperty(V.Args.GV,V.Local.sHold(0),"Caption",V.Local.sHold(1))
+		F.Intrinsic.Control.Case("AddSummaryItem")
+			F.Intrinsic.String.Build("Total_{0}",V.Args.GV,V.Local.sColumns(V.Local.iCnt),V.Local.sHold)
+			Gui.Form.[V.Args.GS].AddSummaryItem(V.Args.GV,V.Local.sColumns(V.Local.iCnt),V.Local.sHold,"Sum","$","","n")
+		F.Intrinsic.Control.Case("DisplayCustomDatetime")
+			Gui.Form.[V.Args.GS].SetColumnProperty(V.Args.GV,V.Local.sColumns(V.Local.iCnt),"DisplayCustomDatetime","d")
+		F.Intrinsic.Control.Case("CellBackColor")
+			Gui.Form.[V.Args.GS].SetColumnProperty(V.Args.GV,V.Local.sColumns(V.Local.iCnt),"CellBackColor",V.Args.sColor)			
+	F.Intrinsic.Control.EndSelect		
+F.Intrinsic.Control.Next(V.Local.iCnt)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("FormatBulk")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: Project",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+Program.Sub.FormatBulk.End
+
+Program.Sub.Absentee.Start
+'12220
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+V.Local.sStartDate.Declare
+V.Local.sEndDate.Declare
+V.Local.sDates.Declare
+V.Local.sEMP.Declare
+V.Local.iCnt.Declare
+V.Local.iCnt2.Declare
+V.Local.sSQL.Declare
+
+F.Intrinsic.String.Format(V.Screen.Form!dtpStartDate.Value,"YYYY-MM-DD",V.Local.sStartDate)
+F.Intrinsic.String.Format(V.Screen.Form!dtpEndDate.Value,"YYYY-MM-DD",V.Local.sEndDate)
+'12220 - Collecting all work days within range
+F.Intrinsic.String.Build("Select distinct CHARGE_DATE from V_TIME_ATTENDANCE where CHARGE_DATE between '{0}' and '{1}'",V.Local.sStartDate,V.Local.sEndDate,V.Local.sDates)
+F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sDates,V.Local.sDates)
+F.Intrinsic.String.Split(V.Local.sDates,"#$#",V.Local.sDates)
+
+F.Intrinsic.Control.If(V.DataTable.dtEmployees.Exists)
+	F.Data.DataTable.Close("dtEmployees")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.DataTable.dtAbsentee.Exists)
+	F.Data.DataTable.Close("dtAbsentee")
+F.Intrinsic.Control.EndIf
+
+F.Data.DataTable.Create("dtAbsentee",True)
+F.Data.DataTable.AddColumn("dtAbsentee","EMPLOYEE","String")
+F.Data.DataTable.AddColumn("dtAbsentee","NAME","String")
+F.Data.DataTable.AddColumn("dtAbsentee","DEPARTMENT","String")
+F.Data.DataTable.AddColumn("dtAbsentee","DATE_ABSENT","String")
+
+F.Data.DataTable.CreateFromSQL("dtEmployees","conx","Select RTRIM(EMPLOYEE) as EMPLOYEE,RTRIM(NAME) as NAME,RTRIM(DEPT_EMPLOYEE) as DEPT from V_EMPLOYEE_MSTR where DATE_TERMINATION = '1900-01-01' and PAY_TYPE <> 'S'",True)
+'12220 - Double loop.  First by each eamployee and then for each eiligible date to look for a lack of record.
+F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataTable.dtEmployees.RowCount--,1)
+	F.Intrinsic.Control.For(V.Local.iCnt2,V.Local.sDates.LBound,V.Local.sDates.UBound,1)
+		F.Intrinsic.String.Build("select CHARGE_DATE from V_TIME_ATTENDANCE where RTRIM(EMPLOYEE) = '{0}' and CHARGE_DATE = '{1}'",V.DataTable.dtEmployees(V.Local.iCnt).EMPLOYEE!FieldValTrim,V.Local.sDates(V.Local.iCnt2).PervasiveDate,V.Local.sSQL)
+		F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSQL,V.Local.sSQL)
+		F.Intrinsic.Control.If(V.Local.sSQL.Trim,=,"")
+			F.Data.DataTable.AddRow("dtAbsentee","EMPLOYEE",V.DataTable.dtEmployees(V.Local.iCnt).EMPLOYEE!FieldValTrim,"NAME",V.DataTable.dtEmployees(V.Local.iCnt).NAME!FieldValTrim,"DEPARTMENT",V.DataTable.dtEmployees(V.Local.iCnt).DEPT!FieldValTrim,"DATE_ABSENT",V.Local.sDates(V.Local.iCnt2))
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iCnt2)
+F.Intrinsic.Control.Next(V.Local.iCnt)
+
+F.Intrinsic.Control.CallSub("AbsentGrid")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.Absentee.End
+
+Program.Sub.AbsentGrid.Start
+'12220
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+
+Gui.Form.GsGcAbsentee.SuspendLayout
+
+Gui.Form.GsGcAbsentee.AddGridviewFromDatatable("gvAbsentee","dtAbsentee")
+Gui.Form.GsGcAbsentee.MainView("gvAbsentee")
+
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","EMPLOYEE","HeaderFontBold",True)
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","NAME","HeaderFontBold",True)
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","DEPARTMENT","HeaderFontBold",True)
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","DATE_ABSENT","HeaderFontBold",True)
+
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","EMPLOYEE","Caption","Employee")
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","NAME","Caption","Name")
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","DEPARTMENT","Caption","Department")
+Gui.Form.GsGcAbsentee.SetColumnProperty("gvAbsentee","DATE_ABSENT","Caption","Date Absent")
+
+Gui.Form.GsGcAbsentee.ResumeLayout
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.AbsentGrid.End
+
+Program.Sub.SetIcon.Start
+F.Intrinsic.Control.Try
+V.Local.sForm.Declare
+V.Local.bExists.Declare
+V.Local.sIcon.Declare
+V.Local.iCounter.Declare
+
+F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,v.Local.sIcon)
+F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+F.Intrinsic.Control.If(V.Local.bExists.Not)
+    F.Intrinsic.String.Build("{0}\GAB\GAS\gss2.ico",V.Caller.PluginsDir,v.Local.sIcon)
+    F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+    F.Intrinsic.Control.If(V.Local.bExists.Not)
+        F.Intrinsic.Control.ExitSub
+    F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.UI.GetFormList(V.Local.sForm)
+F.Intrinsic.String.Split(V.Local.sForm, "*!*", V.Local.sForm)
+
+F.Intrinsic.Control.For(V.Local.iCounter, 0, V.Local.sForm.UBound, 1)
+    Gui.[V.Local.sForm(V.Local.iCounter)]..Icon(V.Local.sIcon)
+F.Intrinsic.Control.Next(V.Local.iCounter)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+Program.Sub.SetIcon.End
+
+
+Program.Sub.Form_UnLoad.Start
+F.Intrinsic.Control.Try
+V.Local..BulkDeclareString(sError)
+
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+F.Intrinsic.Control.EndTry
+
+Program.Sub.Form_UnLoad.End
+
+Program.Sub.cmdExport_Click.Start
+F.Intrinsic.Control.Try
+V.Local..BulkDeclareString(sError,sFileExport,sMsg,sDate,sTime,sDir)
+V.Local..BulkDeclareBoolean(bExcel,bExists)
+
+F.Intrinsic.String.Build("{0}\TimeAttendance",V.Caller.LocalGSSTempDir,V.Local.sDir)
+F.Intrinsic.File.DirExists(V.Local.sDir,V.Local.bExists)
+F.Intrinsic.Control.If(V.Local.bExists.Not)
+	F.Intrinsic.File.CreateDir(V.Local.sDir)
+F.Intrinsic.Control.EndIf
+
+F.Automation.MSExcel.CheckPresence(V.Local.bExcel)
+'12220 - Added If statement to export the correct grid to Excel or CSV
+F.Intrinsic.Control.If(V.Global.iGrid,=,0)
+	'Format date time to create file name with extension date time stamp
+	F.Intrinsic.String.Format(V.Ambient.Date,"MMDDYYYY",V.Local.sDate)
+	F.Intrinsic.String.Format(V.Ambient.Now,"HhNnSs",V.Local.sTime)
+	
+	F.Intrinsic.Control.If(V.Local.bExcel)
+		F.Intrinsic.String.Build("{0}\Tardy{1}_{2}.xlsx",V.Local.sDir,V.Local.sDate,V.Local.sTime,V.Local.sFileExport)
+		Gui.Form.gsAttendance.Export(V.Local.sFileExport,"xlsx")
+		F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}\Tardy{1}_{2}.csv",V.Local.sDir,V.Local.sDate,V.Local.sTime,V.Local.sFileExport)
+		Gui.Form.gsAttendance.Export(V.Local.sFileExport,"csv")
+		F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	'Format date time to create file name with extension date time stamp
+	F.Intrinsic.String.Format(V.Ambient.Date,"MMDDYYYY",V.Local.sDate)
+	F.Intrinsic.String.Format(V.Ambient.Now,"HhNnSs",V.Local.sTime)
+
+	F.Intrinsic.Control.If(V.Local.bExcel)
+		F.Intrinsic.String.Build("{0}\Absentee{1}_{2}.xlsx",V.Local.sDir,V.Local.sDate,V.Local.sTime,V.Local.sFileExport)
+		Gui.Form.GsGcAbsentee.Export(V.Local.sFileExport,"xlsx")
+		F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}\Absentee{1}_{2}.csv",V.Local.sDir,V.Local.sDate,V.Local.sTime,V.Local.sFileExport)
+		Gui.Form.GsGcAbsentee.Export(V.Local.sFileExport,"csv")
+		F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError)
+F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+
+Program.Sub.cmdExport_Click.End
+
+Program.Sub.cmdPrint_Click.Start
+F.Intrinsic.Control.Try
+
+V.Local..BulkDeclareLong(iBIRunID,iRptID,iBILogID)
+V.Local..BulkDeclareString(sError,sVal)
+
+F.Intrinsic.UI.InvokeWaitDialog("Generating report...")
+
+'Log Report
+F.Global.BI.GetRunID(V.Local.iBIRunID)
+F.Global.BI.GetIDFromName("GCG_4905_Emp_Tardy.rpt",True,V.Local.iRptID)
+F.Global.BI.StartLogging(V.Local.iBIRunID,V.Local.iRptID,-1,"",V.Local.iBILogID)
+
+'Stop Logging
+F.Global.BI.StopLogging(V.Local.iBILogID)
+F.Intrinsic.String.Build("{0}*!*{1}*!*{2}",V.Caller.Terminal,V.Screen.Form!dtpStartDate.Value,V.Screen.Form!dtpEndDate.Value,V.Local.sVal)
+
+F.Intrinsic.UI.CloseWaitDialog
+F.Global.BI.RunReportPreProcessor(V.Local.iBIRunID,V.Local.iBILogID,"TRMNL*!*StartDate*!*EndDate",V.Local.sVal,"",-1,True,"",-1,"",-1,"","",V.Local.iBIRunID)
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdPrint_Click.End
+
+Program.Sub.tabMain_Click.Start
+'12220 - To determine which grid is active
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+
+V.Global.iGrid.Set(V.Screen.Form!tabMain.Tab)
+'12220 - Print Crystal Report for Employee Tardy Report only
+F.Intrinsic.Control.If(V.Global.iGrid,=,1)
+	Gui.form.cmdPrint.Visible(False)
+F.Intrinsic.Control.Else
+	Gui.form.cmdPrint.Visible(True)	
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError)
+F.Intrinsic.Control.EndTry
+Program.Sub.tabMain_Click.End
+
+Program.Sub.Comments.Start
+${$0$}$Employee Tardy Report$}$BAO$}$2/26/2018 12:18:38 PM$}$False
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$
+
+'This project will create a custom report at Online System>Reports>Employee Tardy Report - Custom.
+'The report will show the Early/Late Time log in or Early/Late Time log out compared to their setup shift time, with vacation/sick time for a date range selection.
+'User will have to select a date range.
+
+'Columns in report:
+'Employee ID,Employee Name,Shift number,Employee Department
+'Date Employee was late/early, Actual Time log in,
+'Time early/late  log in(Actual Time log in - setup login shift time) in hours/minutes,
+'Time early/late leaving (setup logout shift time - Actual Time log out) in hours/minutes,
+'vacation/sick taken in hours within this date range.
+'Total time worked for the shift
+'Total time worked for the period selected
+
+Program.Sub.Comments.End
